@@ -7,16 +7,17 @@ permissions:
   statuses: write
 
 jobs:
-  unittest:
+  pytest_with_coverage:
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v4
 
     - name: Set up Python 3.13
       uses: actions/setup-python@v3
       with:
         python-version: "3.13"
 
-    - name: Install uv and dependencies
+    - name: Install uv and gh dependencies
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -30,8 +31,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        . .venv/bin/activate 
-        pwd
+        . .venv/bin/activate
         # Dont exit if the next command fails, we want to capture the exit code
         set +e
         pytest --cov=. --cov-config=.coveragerc -m unittest
