@@ -10,7 +10,8 @@ jobs:
   ruff-check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
     - name: Set up Python 3.13
       uses: actions/setup-python@v3
@@ -26,8 +27,9 @@ jobs:
         uv sync --extra dev
         gh extension install thetechcollective/gh-set-status --pin stable
 
-    - name: Test with pytest
+    - name: Check with ruff
       id: Formatting
+      continue-on-error: true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
