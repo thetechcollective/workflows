@@ -28,8 +28,10 @@ jobs:
         run: |
           set +e
           # the `cspell` command will assume all the policies are in the cspell.json file in the root directory
-          cspell lint --no-progress  --config cspell.json >> $GITHUB_STEP_SUMMARY
+          cspell lint --no-progress  --config cspell.json > $CSPELL_OUTPUT
           result=$?
+          echo $CSPELL_OUTPUT
+          echo $CSPELL_OUTPUT >> $GITHUB_STEP_SUMMARY
           set -e
           if [ $result -eq 0 ]; then
             gh set-status success "All spelling checks passed"
