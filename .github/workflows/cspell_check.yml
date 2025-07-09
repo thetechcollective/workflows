@@ -22,7 +22,6 @@ jobs:
 
       - name: Check spelling
         id: spell-check
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
  
