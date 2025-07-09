@@ -28,7 +28,7 @@ jobs:
         run: |
           set +e
           # the `markdownlint-cli2` command will assume all the policies are in the .markdownlint.json file in the root directory
-          markdownlint-cli2 "**/*.md" "#node_modules" >> $GITHUB_STEP_SUMMARY
+          markdownlint-cli2 "**/*.md" "#node_modules" &>> $GITHUB_STEP_SUMMARY
           result=$?
           cat $GITHUB_STEP_SUMMARY
           set -e

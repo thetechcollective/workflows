@@ -29,7 +29,7 @@ jobs:
         run: |
           set +e
           # the `cspell` command will assume all the policies are in the cspell.json file in the root directory
-          cspell lint --no-progress  --config cspell.json >> $GITHUB_STEP_SUMMARY
+          cspell lint --no-progress  --config cspell.json &>> $GITHUB_STEP_SUMMARY
           result=$?
           cat $GITHUB_STEP_SUMMARY
           set -e
