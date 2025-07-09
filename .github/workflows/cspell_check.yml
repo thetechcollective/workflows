@@ -1,4 +1,4 @@
-name: Run ruff
+name: Run cspell check
 
 on:
   workflow_call:
@@ -8,6 +8,7 @@ permissions:
 
 jobs:
   cspell:
+    name: cSpell
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
