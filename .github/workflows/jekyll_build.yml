@@ -6,7 +6,9 @@ on:
 permissions:
   statuses: write
   actions: write
-
+  deployments: write
+  
+  
 jobs:
   build:
     runs-on: ubuntu-latest
