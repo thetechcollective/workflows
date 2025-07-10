@@ -6,6 +6,7 @@ on:
 permissions:
   statuses: write
   actions: write
+  contents: read
 
 jobs:
   build:
@@ -14,7 +15,6 @@ jobs:
       image: ruby:3.2.3-bullseye
     env:
       JEKYLL_ENV: production
-      token: ${{ secrets.READY_PUSHER }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,34 +23,63 @@ jobs:
         id: pages
         uses: actions/configure-pages@v4
 
-      - name: Try to reuse artifact from previous build
-        id: download-artifact
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: jekyll-site-${{ github.sha }}
-          path: ./_site
+      - name: Search for existing artifact across all workflow runs
+        id: find-artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARTIFACT_NAME="jekyll-site-${{ github.sha }}"
+          echo "Searching for artifact: $ARTIFACT_NAME"
+          
+          ARTIFACT_INFO=$(gh api repos/${{ github.repository }}/actions/artifacts \
+            --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\" and .expired == false) | {id: .id}" \
+            | head -n1)
+          
+          if [ ! -z "$ARTIFACT_INFO" ] && [ "$ARTIFACT_INFO" != "null" ]; then
+            ARTIFACT_ID=$(echo "$ARTIFACT_INFO" | jq -r '.id')
+            echo "artifact-found=true" >> $GITHUB_OUTPUT
+            echo "artifact-id=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+            echo "Found existing artifact (ID: $ARTIFACT_ID) for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "artifact-found=false" >> $GITHUB_OUTPUT
+            echo "No existing artifact found for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          fi
 
-      - name: Check if artifact was found
-        if : steps.download-artifact.outputs.artifact-found == 'true'
-        run: echo "Using cached _site folder ('site-build-${{ github.sha }}')" >> $GITHUB_STEP_SUMMARY
+      - name: Download existing artifact
+        if: steps.find-artifact.outputs.artifact-found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ./_site
+          gh api repos/${{ github.repository }}/actions/artifacts/${{ steps.find-artifact.outputs.artifact-id }}/zip > artifact.zip
+          unzip artifact.zip -d ./_site
+          rm artifact.zip
+          echo "Downloaded existing artifact for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
         
       - name: Build with Jekyll
-        if : steps.download-artifact.outputs.artifact-found != 'true'
+        if: steps.find-artifact.outputs.artifact-found != 'true'
         env:
           JEKYLL_ENV: production
         run: |
           bundle update
           bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
-          echo "Built the site with Jekyll" >> $GITHUB_STEP_SUMMARY
+          echo "Built site with Jekyll for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Create version.txt
-        if : steps.download-artifact.outputs.artifact-found != 'true'
-        run: echo "Built from GitHub repo ${{ github.repository }}, SHA ${{ github.sha }}" > ./_site/version.txt
+        run: |
+          echo "Built from GitHub repo ${{ github.repository }}, SHA: ${{ github.sha }}" > ./_site/version.txt
 
-      - name: Upload artifact
-        if : steps.download-artifact.outputs.artifact-found != 'true'
+      # Only upload the SHA-based artifact if we built it (for future reuse)
+      - name: Upload reusable artifact
+        if: steps.find-artifact.outputs.artifact-found != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: jekyll-site-${{ github.sha }}
+          path: ./_site
+          retention-days: 30
+
+      # Always upload for Pages deployment (required by actions/deploy-pages)
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
           path: ./_site
