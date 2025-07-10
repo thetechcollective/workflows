@@ -30,7 +30,7 @@ jobs:
        - name: Search for existing artifact across all workflow runs
          id: find-artifact
          env:
-           GH_TOKEN: ${{ secrets.READY_PUSHER }}
+           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
          run: |
            ARTIFACT_NAME="jekyll-site-${{ github.sha }}"
            echo "Searching for artifact: $ARTIFACT_NAME"
