@@ -32,7 +32,7 @@ jobs:
          env:
            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
          run: |
-           set +x
+           set -x
            ARTIFACT_NAME="jekyll-site-${{ github.sha }}"
            echo "Searching for artifact: $ARTIFACT_NAME"
            
