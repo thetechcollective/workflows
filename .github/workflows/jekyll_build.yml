@@ -1,0 +1,53 @@
+name: Jekyll Build
+
+on:
+  workflow_call:
+
+permissions:
+  statuses: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ruby:3.2.3-bullseye
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v4
+
+      - name: Try to reuse artifact from previous build
+        id: download-artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: jekyll-site-${{ github.sha }}
+          path: ./_site
+
+      - name: Check if artifact was found
+        if : steps.download-artifact.outputs.artifact-found == 'true'
+        run: echo "Using cached _site folder ('site-build-${{ github.sha }}')" >> $GITHUB_STEP_SUMMARY
+        
+      - name: Build with Jekyll
+        if : steps.download-artifact.outputs.artifact-found != 'true'
+        env:
+          JEKYLL_ENV: production
+        run: |
+          bundle update
+          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+          echo "Built the site with Jekyll" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create version.txt
+        if : steps.download-artifact.outputs.artifact-found != 'true'
+        run: echo "Built from GitHub repo ${{ github.repository }}, SHA ${{ github.sha }}" > ./_site/version.txt
+
+      - name: Upload artifact
+        if : steps.download-artifact.outputs.artifact-found != 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: jekyll-site-${{ github.sha }}
+          path: ./_site
