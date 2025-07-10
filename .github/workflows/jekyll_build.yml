@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ruby:3.2.3-bullseye
+    env:
+      JEKYLL_ENV: production
+      token: ${{ secrets.READY_PUSHER }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
