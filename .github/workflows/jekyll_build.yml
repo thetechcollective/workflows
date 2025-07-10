@@ -80,6 +80,8 @@ jobs:
 
        - name: Upload reusable artifact
          if: steps.find-artifact.outputs.artifact-found != 'true'
+         env:
+           GH_TOKEN: ${{ secrets.READY_PUSHER }}
          uses: actions/upload-artifact@v4
          with:
            name: jekyll-site-${{ github.sha }}
@@ -88,6 +90,8 @@ jobs:
 
        # Always upload for Pages deployment (required by actions/deploy-pages)
        - name: Upload Pages artifact
+         env:
+           GH_TOKEN: ${{ secrets.READY_PUSHER }}
          uses: actions/upload-pages-artifact@v3
          with:
            path: ./_site
