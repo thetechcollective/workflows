@@ -25,7 +25,7 @@ jobs:
       - name: Search for existing artifact across all workflow runs
         id: find-artifact
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.READY_PUSHER }}
         run: |
           ARTIFACT_NAME="jekyll-site-${{ github.sha }}"
           echo "Searching for artifact: $ARTIFACT_NAME"
@@ -47,7 +47,7 @@ jobs:
       - name: Download existing artifact
         if: steps.find-artifact.outputs.artifact-found == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.READY_PUSHER }}
         run: |
           mkdir -p ./_site
           gh api repos/${{ github.repository }}/actions/artifacts/${{ steps.find-artifact.outputs.artifact-id }}/zip > artifact.zip
