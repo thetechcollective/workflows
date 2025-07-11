@@ -9,7 +9,7 @@ on:
   
 jobs:
   restore:
-    name: Restore Jekyll Site from Artifact
+    name: Restore artifact
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -24,8 +24,9 @@ jobs:
         env:
            GH_TOKEN: ${{ secrets.READY_PUSHER }}
         run: |
+          set -x
           set +e
-          gh run download -D _site -n jekyll-site-${{ github.sha }}
+          gh run download -R ${{ github.repository }} -D _site -n jekyll-site-${{ github.sha }}
           result=$?
           set -e
           if [ $result -eq 0 ]; then
