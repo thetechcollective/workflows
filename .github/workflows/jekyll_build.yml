@@ -8,9 +8,7 @@ jobs:
     name: Restore Jekyll Site from Artifact
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       actions: write
-      statuses: write
     outputs:
       artifact-found: ${{ steps.restore.outputs.artifact-found }}
 
@@ -42,9 +40,7 @@ jobs:
     name: Build Jekyll Site
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       actions: write
-      statuses: write
 
     steps:
       - name: Checkout
