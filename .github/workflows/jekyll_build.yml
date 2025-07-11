@@ -13,14 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      contents: read
     outputs:
-      artifact-found: ${{ steps.restore.outputs.artifact-found }}
+      artifact-found: ${{ steps.restore-step.outputs.artifact-found }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
          
       - name: Restore if artifact exists
+        id: restore-step
         env:
            GH_TOKEN: ${{ secrets.READY_PUSHER }}
         run: |
