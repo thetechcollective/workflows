@@ -26,6 +26,7 @@ jobs:
         run: |
           set -x
           set +e
+          gh auth status
           gh run download -R ${{ github.repository }} -D _site -n jekyll-site-${{ github.sha }}
           result=$?
           set -e
