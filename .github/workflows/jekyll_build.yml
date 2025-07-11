@@ -2,6 +2,10 @@ name: Jekyll Build
 
 on:
   workflow_call:
+    secrets:
+      READY_PUSHER:
+        description: 'GitHub token for CLI operations'
+        required: true
   
 jobs:
   restore:
