@@ -2,103 +2,98 @@ name: Jekyll Build
 
 on:
   workflow_call:
-
-permissions:
-  statuses: write
-  actions: write
-  deployments: write
-
   
 jobs:
+  restore:
+    name: Restore Jekyll Site from Artifact
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+      statuses: write
+    outputs:
+      artifact-found: ${{ steps.restore.outputs.artifact-found }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+         
+      - name: Restore if artifact exists
+        env:
+           GH_TOKEN: ${{ secrets.READY_PUSHER }}
+        run: |
+          set +e
+          gh run download -D _site -n jekyll-site-${{ github.sha }}
+          result=$?
+          set -e
+          if [ $result -eq 0 ]; then
+            echo "artifact-found=true" >> $GITHUB_OUTPUT
+            echo "Restored existing artifact for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "artifact-found=false" >> $GITHUB_OUTPUT
+            echo "No existing artifact found for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          exit 0
+
 
   build:
-     runs-on: ubuntu-latest
- 
-     steps:
-       - name: Checkout
-         uses: actions/checkout@v4
- 
-       - name: Setup Pages
-         id: pages
-         uses: actions/configure-pages@v4        
-      
-       - name: install rmagick
-         run: |
-           sudo apt-get update
-           sudo apt-get install -y imagemagick libmagickwand-dev
+    if: needs.restore.outputs.artifact-found != 'true'
+    needs: restore
+    name: Build Jekyll Site
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+      statuses: write
 
-       - name: Search for existing artifact across all workflow runs
-         id: find-artifact
-         env:
-           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-         run: |
-           set -x
-           ARTIFACT_NAME="jekyll-site-${{ github.sha }}"
-           echo "Searching for artifact: $ARTIFACT_NAME"
-           
-           ARTIFACT_INFO=$(gh api repos/${{ github.repository }}/actions/artifacts \
-             --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\" and .expired == false) | {id: .id}" \
-             | head -n1)
-           
-           if [ ! -z "$ARTIFACT_INFO" ] && [ "$ARTIFACT_INFO" != "null" ]; then
-             ARTIFACT_ID=$(echo "$ARTIFACT_INFO" | jq -r '.id')
-             echo "artifact-found=true" >> $GITHUB_OUTPUT
-             echo "artifact-id=$ARTIFACT_ID" >> $GITHUB_OUTPUT
-             echo "Found existing artifact (ID: $ARTIFACT_ID) for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-           else
-             echo "artifact-found=false" >> $GITHUB_OUTPUT
-             echo "No existing artifact found for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-           fi
-
-       - name: Download existing artifact
-         if: steps.find-artifact.outputs.artifact-found == 'true'
-         env:
-           GH_TOKEN: ${{ secrets.READY_PUSHER }}
-         run: |
-           mkdir -p ./_site
-           gh api repos/${{ github.repository }}/actions/artifacts/${{ steps.find-artifact.outputs.artifact-id }}/zip > artifact.zip
-           unzip artifact.zip -d ./_site
-           rm artifact.zip
-           echo "Downloaded existing artifact for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+  
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v4        
+       
+      - name: install rmagick
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick libmagickwand-dev
+  
+      - name: Install bundler
+        run: |
+          echo 'export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"' >> $GITHUB_ENV
+          export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
+          gem install bundler --user-install
+  
+      - name: Build with Jekyll
+        env:
+          JEKYLL_ENV: production
+        run: |
+          export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
+          bundle config set --local path 'vendor/bundle'
+          bundle update
+          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+          echo "Built site with Jekyll for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
  
-       - name: Install bundler
-         if: steps.find-artifact.outputs.artifact-found != 'true'
-         run: |
-           echo 'export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"' >> $GITHUB_ENV
-           export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
-           gem install bundler --user-install
- 
-       - name: Build with Jekyll
-         if: steps.find-artifact.outputs.artifact-found != 'true'
-         env:
-           JEKYLL_ENV: production
-         run: |
-           export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
-           bundle config set --local path 'vendor/bundle'
-           bundle update
-           bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
-           echo "Built site with Jekyll for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+      - name: Upload reusable artifact
+        env:
+          GH_TOKEN: ${{ secrets.READY_PUSHER }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jekyll-site-${{ github.sha }}
+          path: ./_site
+          retention-days: 3
 
-       - name: Upload reusable artifact
-         if: steps.find-artifact.outputs.artifact-found != 'true'
-         env:
-           GH_TOKEN: ${{ secrets.READY_PUSHER }}
-         uses: actions/upload-artifact@v4
-         with:
-           name: jekyll-site-${{ github.sha }}
-           path: ./_site
-           retention-days: 30
-
-       # Always upload for Pages deployment (required by actions/deploy-pages)
-       - name: Upload Pages artifact
-         env:
-           GH_TOKEN: ${{ secrets.READY_PUSHER }}
-         uses: actions/upload-pages-artifact@v3
-         with:
-           path: ./_site
- 
- 
+          
+#      # Always upload for Pages deployment (required by actions/deploy-pages)
+#      - name: Upload Pages artifact
+#        env:
+#          GH_TOKEN: ${{ secrets.READY_PUSHER }}
+#        uses: actions/upload-pages-artifact@v3
+#        with:
+#          path: ./_site
+# 
+# 
 #  build2:
 #    runs-on: ubuntu-latest
 #    container:
