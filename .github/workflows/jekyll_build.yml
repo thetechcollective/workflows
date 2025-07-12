@@ -28,8 +28,8 @@ jobs:
         run: |
           set -x
           set +e
-          gh auth status
-          gh run download -R ${{ github.repository }} -D _site -n jekyll-site-${{ github.sha }}
+          #gh run download -R ${{ github.repository }} -D _site -n jekyll-site-${{ github.sha }}
+          gh run download -R ${{ github.repository }} -D _site -n jekyll-site-ba13d590ceb78e7e4572f58e1b715fd201f6ac94
           result=$?
           set -e
           if [ $result -eq 0 ]; then
@@ -40,7 +40,6 @@ jobs:
             echo "No existing artifact found for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           fi
           exit 0
-
 
   build:
     if: needs.restore.outputs.artifact-found != 'true'
@@ -88,6 +87,11 @@ jobs:
           path: ./_site
           retention-days: 3
 
+        # Always upload for Pages deployment (required by actions/deploy-pages)
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site
           
 #      # Always upload for Pages deployment (required by actions/deploy-pages)
 #      - name: Upload Pages artifact
