@@ -28,7 +28,7 @@ jobs:
         run: |
           set -x
           set +e
-          gh run download -R ${{ github.repository }} -D _site -n jekyll-site-ba13d590ceb78e7e4572f58e1b715fd201f6ac94
+          gh run download -R ${{ github.repository }} -D _site -n jekyll-site-${{ github.sha }}
           result=$?
           set -e
           if [ $result -eq 0 ]; then
