@@ -12,8 +12,8 @@ jobs:
     name: Restore artifact
     runs-on: ubuntu-latest
     permissions:
-      actions: write
-      contents: read
+      actions: read
+      statuses: write
     outputs:
       artifact-found: ${{ steps.restore-step.outputs.artifact-found }}
 
@@ -28,7 +28,6 @@ jobs:
         run: |
           set -x
           set +e
-          #gh run download -R ${{ github.repository }} -D _site -n jekyll-site-${{ github.sha }}
           gh run download -R ${{ github.repository }} -D _site -n jekyll-site-ba13d590ceb78e7e4572f58e1b715fd201f6ac94
           result=$?
           set -e
@@ -52,11 +51,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-  
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v4        
-       
+                         
       - name: install rmagick
         run: |
           sudo apt-get update
@@ -67,16 +62,39 @@ jobs:
           echo 'export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"' >> $GITHUB_ENV
           export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
           gem install bundler --user-install
-  
+
+      - name: Install gh dependencies
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh extension install thetechcollective/gh-set-status --pin stable          
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v4    
+          
       - name: Build with Jekyll
+        id: jekyll-build
         env:
           JEKYLL_ENV: production
         run: |
           export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
           bundle config set --local path 'vendor/bundle'
           bundle update
+          set +e
           bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
-          echo "Built site with Jekyll for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          result=$?
+          set -e
+          if [ $result -eq 0 ]; then
+            echo "Built site with Jekyll for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+            echo "Base URL: '${{ steps.pages.outputs.base_path }}'" >> $GITHUB_STEP_SUMMARY
+            echo "JekyllEnvironment: '${JEKYLL_ENV}'" >> $GITHUB_STEP_SUMMARY
+            gh set-status success "All spelling checks passed"
+          else
+            echo "Jekyll build failed" >> $GITHUB_STEP_SUMMARY
+            gh set-status failure "Jekyll build failed"
+          fi
+          exit $result
  
       - name: Upload reusable artifact
         env:
@@ -92,97 +110,3 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./_site
-          
-#      # Always upload for Pages deployment (required by actions/deploy-pages)
-#      - name: Upload Pages artifact
-#        env:
-#          GH_TOKEN: ${{ secrets.READY_PUSHER }}
-#        uses: actions/upload-pages-artifact@v3
-#        with:
-#          path: ./_site
-# 
-# 
-#  build2:
-#    runs-on: ubuntu-latest
-#    container:
-#      image: ruby:3.2.3-bullseye
-#    env:
-#      JEKYLL_ENV: production
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v4
-#
-#      - name: Install GitHub CLI and jq
-#        run: |
-#          apt-get update
-#          apt-get install -y curl jq
-#          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-#          chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-#          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-#          apt-get update
-#          apt-get install -y gh
-#
-#      - name: Setup Pages
-#        id: pages
-#        uses: actions/configure-pages@v4
-#
-#      - name: Search for existing artifact across all workflow runs
-#        id: find-artifact
-#        env:
-#          GH_TOKEN: ${{ secrets.READY_PUSHER }}
-#        run: |
-#          ARTIFACT_NAME="jekyll-site-${{ github.sha }}"
-#          echo "Searching for artifact: $ARTIFACT_NAME"
-#          
-#          ARTIFACT_INFO=$(gh api repos/${{ github.repository }}/actions/artifacts \
-#            --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\" and .expired == false) | {id: .id}" \
-#            | head -n1)
-#          
-#          if [ ! -z "$ARTIFACT_INFO" ] && [ "$ARTIFACT_INFO" != "null" ]; then
-#            ARTIFACT_ID=$(echo "$ARTIFACT_INFO" | jq -r '.id')
-#            echo "artifact-found=true" >> $GITHUB_OUTPUT
-#            echo "artifact-id=$ARTIFACT_ID" >> $GITHUB_OUTPUT
-#            echo "Found existing artifact (ID: $ARTIFACT_ID) for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-#          else
-#            echo "artifact-found=false" >> $GITHUB_OUTPUT
-#            echo "No existing artifact found for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-#          fi
-#
-#      - name: Download existing artifact
-#        if: steps.find-artifact.outputs.artifact-found == 'true'
-#        env:
-#          GH_TOKEN: ${{ secrets.READY_PUSHER }}
-#        run: |
-#          mkdir -p ./_site
-#          gh api repos/${{ github.repository }}/actions/artifacts/${{ steps.find-artifact.outputs.artifact-id }}/zip > artifact.zip
-#          unzip artifact.zip -d ./_site
-#          rm artifact.zip
-#          echo "Downloaded existing artifact for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-#        
-#      - name: Build with Jekyll
-#        if: steps.find-artifact.outputs.artifact-found != 'true'
-#        env:
-#          JEKYLL_ENV: production
-#        run: |
-#          bundle update
-#          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
-#          echo "Built site with Jekyll for SHA ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-#
-#      - name: Create version.txt
-#        run: |
-#          echo "Built from GitHub repo ${{ github.repository }}, SHA: ${{ github.sha }}" > ./_site/version.txt
-#
-#      # Only upload the SHA-based artifact if we built it (for future reuse)
-#      - name: Upload reusable artifact
-#        if: steps.find-artifact.outputs.artifact-found != 'true'
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: jekyll-site-${{ github.sha }}
-#          path: ./_site
-#          retention-days: 30
-#
-#      # Always upload for Pages deployment (required by actions/deploy-pages)
-#      - name: Upload Pages artifact
-#        uses: actions/upload-pages-artifact@v3
-#        with:
-#          path: ./_site
