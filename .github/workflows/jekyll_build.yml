@@ -107,4 +107,10 @@ jobs:
           path: ./_site
           retention-days: 3
 
-
+        # Always upload for Pages deployment (required by actions/deploy-pages)
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site
+          retention-days: 3
+          name: github-pages-${{ github.repository_id }}-${{ github.sha }}
