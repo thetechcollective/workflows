@@ -47,6 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      statuses: write
 
     steps:
       - name: Checkout
@@ -77,6 +78,7 @@ jobs:
         id: jekyll-build
         env:
           JEKYLL_ENV: production
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}        
         run: |
           export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
           bundle config set --local path 'vendor/bundle'
