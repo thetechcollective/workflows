@@ -1,7 +1,0 @@
-{
-    "/localhome/GitHub/thetechcollective/workflows": {
-        "gh project view 12 --owner thetechcollective --format json --jq '.id'": "PVT_kwDOCP77xc4AxZbF",
-        "gh project item-add 12 --owner thetechcollective --url https://github.com/thetechcollective/workflows/issues/1 --format json --jq '.id'": "PVTI_lADOCP77xc4AxZbFzgfM3RY",
-        "gh project field-list 12 --owner thetechcollective --format json --jq '.fields[] | select(.name == \"Status\")'": "{\"id\":\"PVTSSF_lADOCP77xc4AxZbFzgng8E0\",\"name\":\"Status\",\"options\":[{\"id\":\"f75ad846\",\"name\":\"Todo\"},{\"id\":\"8e24e4a6\",\"name\":\"Blocked\"},{\"id\":\"90801ca3\",\"name\":\"Deferred\"},{\"id\":\"47fc9ee4\",\"name\":\"In Progress\"},{\"id\":\"223e2780\",\"name\":\"Delivery Initiated\"},{\"id\":\"98236657\",\"name\":\"Done\"}],\"type\":\"ProjectV2SingleSelectField\"}"
-    }
-}
