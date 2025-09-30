@@ -1,0 +1,239 @@
+name: Pulumi IaC
+run-name: '${{ inputs.environment }} deployment. Cmd: ${{ inputs.command }}, Refresh: ${{ inputs.refresh }}'
+on:
+    workflow_call:
+      inputs:
+        environment:
+          description: 'Environment to deploy to'
+          required: true
+          type: string
+        command:
+          description: 'Pulumi command to run (preview or up)'
+          required: true
+          type: string
+        refresh:
+          description: 'Refresh the Pulumi stack'
+          required: true
+          type: string
+          default: 'false'
+
+concurrency:
+  group: cd-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  statuses: write
+  contents: read
+
+jobs:
+  pulumi:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Required environment variables and secrets check
+        run: |
+          echo "=== Checking environment secrets and variables ===" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+
+          PASSED=true
+
+          if [ -n "${{ secrets.DE_ACR_PASSWORD }}" ]; then
+            echo  '✅ `secrets.DE_ACR_PASSWORD`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo '❌ `secrets.DE_ACR_PASSWORD`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false
+          fi
+
+          if [ -n "${{ secrets.DE_ACR_USERNAME }}" ]; then
+            echo  '✅ `secrets.DE_ACR_USERNAME`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo  '❌ `secrets.DE_ACR_USERNAME`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false
+          fi          
+          
+          if [ -n "${{ secrets.SP_CLIENT_SECRET }}" ]; then
+            echo  '✅ `secrets.SP_CLIENT_SECRET`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo  '❌ `secrets.SP_CLIENT_SECRET`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false  
+          fi
+
+          if [ -n "${{ secrets.PULUMI_CONFIG_PASSPHRASE }}" ]; then
+            echo  '✅ `secrets.PULUMI_CONFIG_PASSPHRASE`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo  '❌ `secrets.PULUMI_CONFIG_PASSPHRASE`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false  
+          fi          
+          
+          if [ -n "${{ vars.SP_CLIENT_ID }}" ]; then
+            echo  '✅ `vars.SP_CLIENT_ID`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo  '❌ `vars.SP_CLIENT_ID`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false
+          fi
+
+          if [ -n "${{ vars.SUBSCRIPTION_ID }}" ]; then
+            echo  '✅ `vars.SUBSCRIPTION_ID`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo  '❌ `vars.SUBSCRIPTION_ID`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false  
+          fi
+          
+          if [ -n "${{ vars.TENANT_ID }}" ]; then
+            echo  '✅ `vars.TENANT_ID`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo  '❌ `vars.TENANT_ID`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false  
+          fi          
+
+          if [ -n "${{ vars.RESOURCE_GROUP }}" ]; then
+            echo  '✅ `vars.RESOURCE_GROUP`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo  '❌ `vars.RESOURCE_GROUP`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false  
+          fi
+
+          if [ -n "${{ vars.ENV_PREFIX }}" ]; then
+            echo  '✅ `vars.ENV_PREFIX`' >> $GITHUB_STEP_SUMMARY
+          else
+            echo  '❌ `vars.ENV_PREFIX`' >> $GITHUB_STEP_SUMMARY
+            PASSED=false  
+          fi
+
+          if [ "$PASSED" = false ]; then
+            echo "One or more required secrets or variables are missing. Failing the job." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+                
+      - uses: actions/checkout@v5
+      
+      - name: Log in to Azure using Service Principal
+        uses: azure/login@v2
+        with:
+          auth-type: 'SERVICE_PRINCIPAL'
+          creds: '{
+                    "clientId": "${{ vars.SP_CLIENT_ID }}",
+                    "clientSecret": "${{ secrets.SP_CLIENT_SECRET }}",
+                    "subscriptionId": "${{ vars.SUBSCRIPTION_ID }}",
+                    "tenantId": "${{ vars.TENANT_ID }}"
+                  }'
+    
+      - name: Install dependencies
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          pushd iac
+          uv venv --python 3.12
+          uv sync --extra dev
+          popd
+          . iac/.venv/bin/activate          
+                  
+          gh extension install thetechcollective/gh-set-status --pin stable
+        
+      - name: Configure Pulumi Backend
+        run: |
+          # Get the Storage Account name and key
+          STORAGE_ACCOUNT=$(az storage account list --resource-group "${{ vars.RESOURCE_GROUP }}" \
+            --query "[?starts_with(name, '${{ vars.ENV_PREFIX }}sa')].name" -o tsv | head -n 1)
+          STORAGE_KEY=$(az storage account keys list --account-name "$STORAGE_ACCOUNT" \
+            --resource-group "${{ vars.RESOURCE_GROUP }}" --query "[0].value" -o tsv)
+          
+          echo "Using storage account: $STORAGE_ACCOUNT"
+          echo "Using container: ${{ vars.ENV_PREFIX }}-pulumi-state"
+          
+          # Export environment variables for Pulumi
+          echo "AZURE_STORAGE_ACCOUNT=$STORAGE_ACCOUNT" >> $GITHUB_ENV
+          echo "AZURE_STORAGE_KEY=$STORAGE_KEY" >> $GITHUB_ENV
+          
+          # Set up Azure credentials for Pulumi
+          echo "ARM_CLIENT_ID=${{ vars.SP_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=${{ secrets.SP_CLIENT_SECRET }}" >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=${{ vars.SUBSCRIPTION_ID }}" >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=${{ vars.TENANT_ID }}" >> $GITHUB_ENV
+          
+      - name: Check storage container
+        run: |
+          echo "Checking for existing stack files in storage container..."
+          az storage blob list --container-name "${{ vars.ENV_PREFIX }}-pulumi-state" \
+            --account-name "$AZURE_STORAGE_ACCOUNT" \
+            --account-key "$AZURE_STORAGE_KEY" \
+            --prefix "stacks/" --output table
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ env.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ env.AZURE_STORAGE_KEY }}
+        
+      - name: Setup Pulumi Stack
+        working-directory: iac
+        run: |
+          source .venv/bin/activate
+
+          export PULUMI_CONFIG_PASSPHRASE="${{ secrets.PULUMI_CONFIG_PASSPHRASE }}"
+          
+          # Login to Pulumi with Azure Blob Storage backend
+          pulumi login "azblob://${{ vars.ENV_PREFIX }}-pulumi-state"
+          
+          # Check for the fully qualified stack name
+          FULL_STACK_NAME="${{ vars.ENV_PREFIX }}"
+          echo "Checking for stack: $FULL_STACK_NAME"
+
+          # Check if the stack exists
+          pulumi whoami -v
+          pulumi stack ls
+
+          if ! pulumi stack ls | grep -q "$FULL_STACK_NAME"; then
+            echo "Stack $FULL_STACK_NAME does not exist, creating it..." >> $GITHUB_STEP_SUMMARY
+            pulumi stack init "$FULL_STACK_NAME" --secrets-provider="passphrase"
+
+          else
+            echo "Stack $FULL_STACK_NAME exists, selecting it..."
+            pulumi stack select "$FULL_STACK_NAME"
+          fi
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ env.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ env.AZURE_STORAGE_KEY }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+          DE_ACR_PASSWORD: ${{ secrets.DE_ACR_PASSWORD }}
+          DE_ACR_USERNAME: ${{ secrets.DE_ACR_USERNAME }}
+
+          # Azure Service Principal credentials for Pulumi
+          ARM_CLIENT_ID: ${{ vars.SP_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.SP_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ vars.TENANT_ID }}
+          
+      - name: Run Pulumi Command
+        working-directory: iac
+        run: |
+          source .venv/bin/activate
+
+          if [ "${{ inputs.refresh }}" = "true" ]; then
+            echo "Refreshing the Pulumi stack..." >> $GITHUB_STEP_SUMMARY
+            pulumi refresh --yes
+          fi
+          
+          if [ "${{ inputs.command }}" = "preview" ]; then
+            pulumi preview --non-interactive --show-secrets
+          else
+            pulumi up --non-interactive --yes --show-secrets 
+          fi
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ env.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ env.AZURE_STORAGE_KEY }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+
+          DE_ACR_PASSWORD: ${{ secrets.DE_ACR_PASSWORD }}
+          DE_ACR_USERNAME: ${{ secrets.DE_ACR_USERNAME }}
+          
+          # Azure Service Principal credentials for Pulumi
+          ARM_CLIENT_ID: ${{ vars.SP_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.SP_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ vars.TENANT_ID }}
+
+      - name: Mark commit as successful
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh set-status success "Pulumi Deployment - ${{ inputs.environment }}"
