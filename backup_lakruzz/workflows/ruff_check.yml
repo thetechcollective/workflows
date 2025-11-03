@@ -1,0 +1,60 @@
+name: Ruff
+
+on:
+  workflow_call:
+    inputs:
+      context:
+        required: false
+        type: string
+        default: 'ruff-lint'
+        description: 'Identifier for the workflow when reporting status'
+      continue-on-error:
+        required: false
+        type: boolean
+        default: false
+        description: 'When set to true, the workflow will continue even if there are errors'
+
+permissions:
+  statuses: write
+  contents: read
+
+jobs:
+  ruff-check:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.13"
+
+    - name: Install uv and gh dependencies
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        uv venv
+        uv sync --extra dev
+        gh extension install thetechcollective/gh-set-status --pin stable
+
+    - name: Check with ruff
+      id: linting
+      continue-on-error: ${{ inputs.continue-on-error }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        . .venv/bin/activate
+        # Dont exit if the next command fails, we want to capture the exit code
+        set +e
+        ruff check . --output-format concise --output-file $GITHUB_STEP_SUMMARY
+        result=$?
+        set -e
+        if [ $result -eq 0 ]; then
+          gh set-status success "All linting checks passed" "${{ inputs.context }}"
+        else
+          gh set-status failure "Some linting checks failed" "${{ inputs.context }}"
+        fi
+        exit $result

@@ -1,0 +1,39 @@
+name: Inherit statuses
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Optional commit reference to inherit statuses from (if omitted, ref is derived from the current commit message)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  statuses: write
+  contents: read
+
+jobs:
+  inherit-statuses:
+    name: Inherit statuses
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install gh dependencies
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh extension install thetechcollective/gh-set-status --pin experimental
+
+    - name: Inherit statuses
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        if [ -n "${{ inputs.ref }}" ]; then
+          gh set-status inherit "${{ inputs.ref }}" 2>> $GITHUB_STEP_SUMMARY
+        else
+          gh set-status inherit 2>> $GITHUB_STEP_SUMMARY
+        fi
+

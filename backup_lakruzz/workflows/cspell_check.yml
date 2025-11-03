@@ -1,0 +1,55 @@
+name: Cspell
+
+on:
+  workflow_call:
+    inputs:
+      config_file:
+        description: 'Path to the cspell configuration file - relative to the repository root'
+        required: false
+        type: string
+        default: 'cspell.json'
+      context:
+        required: false
+        type: string
+        default: 'cspell-lint'
+        description: 'Identifier for the workflow when reporting status'
+
+permissions:
+  statuses: write
+  contents: read
+
+jobs:
+  cspell:
+    name: cSpell
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install cspell and gh dependencies
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm install -g cspell
+          gh extension install thetechcollective/gh-set-status --pin stable        
+
+      - name: Check spelling
+        id: spell-check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ 
+        run: |
+          
+          set +e
+          # Use the configurable config file path
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cspell lint --no-progress --config ${{ inputs.config_file }} &>> $GITHUB_STEP_SUMMARY
+          result=$?
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          set -e
+          if [ $result -eq 0 ]; then
+            gh set-status success "All spelling checks passed" "${{ inputs.context }}"
+          else
+            gh set-status failure "Some spelling checks failed" "${{ inputs.context }}"
+          fi
+          exit $result
