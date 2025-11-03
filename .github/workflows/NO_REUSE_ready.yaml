@@ -1,0 +1,44 @@
+# This workflow is intended to be used only in this repository.
+# It is not a reusable workflow!
+name: Ready
+
+on:
+  workflow_dispatch:
+  push:
+    branches: 
+      - 'ready/*'
+      
+jobs:
+
+  inherit-statuses:
+    name: Inherit statuses
+    permissions:
+      statuses: write
+      contents: read
+    uses: ./.github/workflows/doing_inherit_statuses.yaml
+  
+  fast-forward-merge:
+    name: Merge
+    needs:
+      - inherit-statuses
+    permissions:
+      contents: write
+    secrets:
+      token: ${{ secrets.VEMOLISTA_READY_PUSHER_TEST }}
+    uses: ./.github/workflows/doing_fast_forward.yaml
+    with:
+      target_branch: main #default is main
+      user_name: "GitHub Action: ready"
+      user_email: "tt-ready@thetechcollective.dev"
+
+  close_issue:
+    needs: fast-forward-merge
+    permissions:
+      issues: write
+      contents: write
+    uses: ./.github/workflows/doing_close_issue.yaml
+    with:
+      user_name: "GitHub Action: ready"
+      user_email: "tt-ready@thetechcollective.dev"
+      delete_issue_branch: true # default is true
+      delete_ready_branch: true # default is true

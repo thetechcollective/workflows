@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     name: YAML extension
     needs: mark-pending
+    permissions:
+      statuses: write
     
     steps:
       - name: Checkout code
@@ -81,6 +83,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Semantic prefix
     needs: mark-pending
+    permissions:
+      statuses: write
     
     steps:
       - name: Checkout code
@@ -95,7 +99,7 @@ jobs:
         id: prefix_check
         run: |
             # Find all files in .github/workflows directory
-            files=$(find .github/workflows -type f -name "*.yaml" ! -name ".*")
+            files=$(find .github/workflows -type f ! -name ".*")
             
             # Track if any files have wrong prefix
             failed=0
