@@ -24,7 +24,7 @@ jobs:
     permissions:
       contents: write
     secrets:
-      token: ${{ secrets.VEMOLISTA_READY_PUSHER_TEST }}
+      token: ${{ secrets.READY_PUSHER }}
     uses: ./.github/workflows/doing_fast_forward.yaml
     with:
       target_branch: main #default is main
