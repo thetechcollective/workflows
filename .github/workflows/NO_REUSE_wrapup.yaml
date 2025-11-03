@@ -1,0 +1,77 @@
+# This workflow is intended to be used only in this repository.
+# It is not a reusable workflow!
+
+name: Wrapup
+# This workflow is triggered on push to branches that begins with a number (issue-branches)
+# It's designed to support the wrapup process in thetechcollective/gh-tt GitHub CLI extension
+on:
+  workflow_dispatch:
+  push:
+    branches: 
+      - '[0-9]*'
+
+jobs:
+  mark-pending:
+    name: Statuses
+    permissions:
+      statuses: write
+      contents: read
+    uses: lakruzz/workflows/.github/workflows/mark_pending.yml@experimental
+    with:
+      statuses: |
+        YAML extension
+        
+  yaml_extension_check:
+    runs-on: ubuntu-latest
+    name: YAML extension
+    needs: mark-pending
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install gh deps
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh ext install thetechcollective/gh-set-status --pin stable
+        
+      - name: Check YAML extensions
+        id: yaml_check
+        run: |
+          # Find all files in .github/workflows directory
+          files=$(find .github/workflows -type f -name "*" ! -name ".*")
+          
+          # Track if any files have wrong extension
+          failed=0
+          
+          # Check each file
+          for file in $files; do
+            if [[ ! "$file" =~ \.yaml$ ]]; then
+              echo "❌ ERROR: File '$file' does not have .yaml extension" >> $GITHUB_STEP_SUMMARY
+              failed=1
+            else
+              echo "✓ File '$file' has correct .yaml extension"
+            fi
+          done
+          
+          # Exit with error if any files failed
+          if [ $failed -eq 1 ]; then
+            echo ""
+            echo "All workflow files must use .yaml extension (not .yml)" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          
+          echo ""
+          echo "✓ All workflow files use .yaml extension" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report status
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: always()
+        run: |
+            if [ ${{ steps.yaml_check.outcome }} == 'success' ]; then
+                gh set-status success "All workflows are *.yaml files" "YAML extension"
+            else
+                gh set-status failure "Some workflows are not *.yaml files" "YAML extension"
+                exit 1
+            fi
