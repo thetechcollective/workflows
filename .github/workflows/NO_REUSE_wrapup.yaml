@@ -75,3 +75,34 @@ jobs:
                 gh set-status failure "Some workflows are not *.yaml files" "YAML extension"
                 exit 1
             fi
+
+  prefix:
+    runs-on: ubuntu-latest
+    name: Semantic prefix
+    needs: mark-pending
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install gh deps
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh ext install thetechcollective/gh-set-status --pin stable
+        
+      - name: Check YAML extensions
+        id: prefix_check
+        run: |
+          # TODO: workflows must be prefix with either checking, doing, or NO_REUSE
+
+      - name: Report status
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: always()
+        run: |
+            if [ ${{ steps.prefix_check.outcome }} == 'success' ]; then
+                gh set-status success "All workflows are *.yaml files" "YAML extension"
+            else
+                gh set-status failure "Some workflows are not *.yaml files" "YAML extension"
+                exit 1
+            fi
