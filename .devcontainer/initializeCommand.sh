@@ -7,7 +7,7 @@ echo "$PREFIX Running $(basename $0)"
 
 echo "$PREFIX Initializing  GH CLI"
 
-$(dirname $0)/gh-login.sh initialize
+$(dirname $0)/gh_login.sh initialize
 
 echo "$PREFIX SUCCESS"
 exit 0

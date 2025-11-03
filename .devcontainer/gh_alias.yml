@@ -1,0 +1,4 @@
+workon:  '!gh tt workon "$@"'
+wrapup:  '!gh tt wrapup "$@"'
+deliver: '!gh tt deliver "$@"'
+semver:  '!gh tt semver "$@"'

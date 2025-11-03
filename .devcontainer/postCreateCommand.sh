@@ -11,20 +11,14 @@ git config --global --add safe.directory /workspace
 echo "$PREFIX Setting up git configuration to support .gitconfig in repo-root"
 git config --local --get include.path | grep -e ../.gitconfig >/dev/null 2>&1 || git config --local --add include.path ../.gitconfig
 
-echo "$PREFIX Setting up the uv environment"
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv --python 3.11
-. .venv/bin/activate
-uv sync --extra dev
-
 # Check if the GH CLI is required
 if [ -e $(dirname $0)/_temp.token ]; then
     echo "$PREFIX setting up GitHub CLI"
-    $(dirname $0)/gh-login.sh postcreate
+    $(dirname $0)/gh_login.sh postcreate
     echo "$PREFIX Installing the techcollective/gh-tt gh cli extension"
-    gh extension install thetechcollective/gh-tt
-    echo "$PREFIX Installing the gh aliases"    
-    gh alias import .gh_alias.yml --clobber
+    gh extension install thetechcollective/gh-tt --pin stable
+    echo "$PREFIX Installing the gh aliases"
+    gh alias import $(dirname $0)/gh_alias.yml --clobber
 
 fi
 
