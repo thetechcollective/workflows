@@ -20,6 +20,7 @@ jobs:
     with:
       statuses: |
         YAML extension
+        Semantic prefix
         
   yaml_extension_check:
     runs-on: ubuntu-latest
@@ -93,7 +94,32 @@ jobs:
       - name: Check YAML extensions
         id: prefix_check
         run: |
-          # TODO: workflows must be prefix with either checking, doing, or NO_REUSE
+            # Find all files in .github/workflows directory
+            files=$(find .github/workflows -type f -name "*.yaml" ! -name ".*")
+            
+            # Track if any files have wrong prefix
+            failed=0
+            
+            # Check each file
+            for file in $files; do
+                filename=$(basename "$file")
+                if [[ "$filename" =~ ^(checking|doing|NO_REUSE)_ ]]; then
+                echo "✓ File '$filename' has valid semantic prefix"
+                else
+                echo "❌ ERROR: File '$filename' does not have a valid prefix (checking_, doing_, or NO_REUSE_)" >> $GITHUB_STEP_SUMMARY
+                failed=1
+                fi
+            done
+            
+            # Exit with error if any files failed
+            if [ $failed -eq 1 ]; then
+                echo ""
+                echo "All workflow files must be prefixed with 'checking_', 'doing_', or 'NO_REUSE_'" >> $GITHUB_STEP_SUMMARY
+                exit 1
+            fi
+            
+            echo ""
+            echo "✓ All workflow files have valid semantic prefixes" >> $GITHUB_STEP_SUMMARY
 
       - name: Report status
         env:
@@ -101,8 +127,8 @@ jobs:
         if: always()
         run: |
             if [ ${{ steps.prefix_check.outcome }} == 'success' ]; then
-                gh set-status success "All workflows are *.yaml files" "YAML extension"
+                gh set-status success "All workflows are *.yaml files" "Semantic prefix"
             else
-                gh set-status failure "Some workflows are not *.yaml files" "YAML extension"
+                gh set-status failure "Some workflows are not *.yaml files" "Semantic prefix"
                 exit 1
             fi
