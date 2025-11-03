@@ -1,3 +1,5 @@
 .tt_cache
 **/.venv/
 _temp.token
+
+temp/
