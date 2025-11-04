@@ -16,7 +16,7 @@ jobs:
     permissions:
       statuses: write
       contents: read
-    uses: lakruzz/workflows/.github/workflows/mark_pending.yml@experimental
+    uses: ./.github/workflows/doing_mark_pending.yaml
     with:
       statuses: |
         YAML extension
