@@ -20,6 +20,11 @@ on:
         type: string
         description: >
           Python versions to use, e.g. "['3.11', '3.12']". Must be a string representing a JSON array of strings.The tests will be run against all versions in parallel. The workflow run will run for all python versions regardless of individual failures. A failure in any python version will fail the workflow run.
+      uv-sync-args:
+        required: false
+        type: string
+        default: '--extra dev'
+        description: 'Argument string to pass to `uv sync --locked` when setting up the environment. E.g. passing --dev results in `uv sync --locked --dev'
       
 permissions:
   statuses: write
@@ -49,7 +54,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         gh extension install thetechcollective/gh-set-status --pin stable
-        uv sync --locked --extra dev
+        uv sync --locked ${{ inputs.uv-sync-args }}
     
     - name: Run tests
       id: tests

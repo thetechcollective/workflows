@@ -17,7 +17,7 @@ on:
         required: false
         type: string
         default: '--extra dev'
-        description: 'Argument string to pass to uv sync when setting up the environment'
+        description: 'Argument string to pass to `uv sync --locked` when setting up the environment. E.g. passing --dev results in `uv sync --locked --dev'
 
 permissions:
   statuses: write
@@ -42,7 +42,7 @@ jobs:
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
         uv venv
-        uv sync ${{ inputs.uv-sync-args }}
+        uv sync --locked ${{ inputs.uv-sync-args }}
         gh extension install thetechcollective/gh-set-status --pin stable
 
     - name: Check with ruff
