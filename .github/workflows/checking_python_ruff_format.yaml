@@ -13,6 +13,11 @@ on:
         type: boolean
         default: false
         description: 'When set to true, the workflow will continue even if there are errors'
+      uv-sync-args:
+        required: false
+        type: string
+        default: '--extra dev'
+        description: 'Argument string to pass to `uv sync --locked` when setting up the environment. E.g. passing --dev results in `uv sync --locked --dev'
 
 permissions:
   statuses: write
@@ -24,10 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python 3.13
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v6
       with:
         python-version: "3.13"
 
@@ -37,7 +42,7 @@ jobs:
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
         uv venv
-        uv sync --extra dev
+        uv sync --locked ${{ inputs.uv-sync-args }}
         gh extension install thetechcollective/gh-set-status --pin stable
 
     - name: Check with ruff
